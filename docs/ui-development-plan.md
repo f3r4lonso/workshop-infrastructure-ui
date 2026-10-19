@@ -1,6 +1,7 @@
 # UI development plan — "see everything I have"
 
-Status: proposed (2026-10-19). Waiting for the owner's approval at Gate A before any build work.
+Status: built (2026-10-19). The owner asked to develop the project, which was taken as Gate A approval with the
+proposed answers to decisions 2–4. Results and open items: [ui-review.md](ui-review.md).
 
 ## 1. Goal
 
