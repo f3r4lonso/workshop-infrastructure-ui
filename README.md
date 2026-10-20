@@ -1,9 +1,13 @@
 # Workshop Infrastructure UI
 
-A local web page that shows everything in the Workshop (tasks, agents, skills, documents, applications,
-AI-client guides and personal assistants) and opens your AI clients (Claude Code, Codex CLI, Gemini CLI,
-GitHub Copilot CLI) with one click. Find any item by typing, see what it is for and how to use it, copy the
-ready-to-paste text, and open its document or folder.
+> **Merging into Workshop AI v2** (decisions D-V2-01/02, approved 2026-10-20): this code moves into
+> `applications/workshop-ai/` (done in increment V1, 2026-10-20). This repository is now read-only history:
+> develop the app in `workshop-ai`.
+> Plan: `infra/docs/workshop-ai-v2/`.
+
+A local web page that shows Workshop resources and opens AI clients. Its right workspace includes a Spanish
+reading assistant and an ordered agent-chain builder that passes each completed response to the next selected
+Workshop agent.
 
 ## Start
 
@@ -25,21 +29,28 @@ needs Node.js. Later starts are instant. Python 3.12 is required; no Python pack
 | Clientes IA | `infra/clients/*/README.md` |
 | Asistentes | `infra/agents/personal-assistants/*.md` |
 
-**Detail panel:** what the item is for; **Cómo usarlo** with **Copiar** (ready-to-paste text: `/workshop:<skill>`,
-`Usa el agente workshop:<agent> para `, the task path for active tasks, `claude --agent workshop:<assistant>`, an
-application's start command as text) and where to paste it; **Relacionado** for tasks; **Abrir documento** and
-**Abrir carpeta**.
+**Reading assistant:** the detail area is a dedicated reading workspace. Open the selected Workshop resource,
+enter a Workshop-relative path, paste text, or choose a TXT, Markdown or DOCX file. Review the cleaned original,
+request Spanish translation through local Ollama, and listen with browser speech controls. Uploads and pasted text
+are processed in memory and are not saved to the Workshop.
+
+**Agent chains:** choose 2–5 distinct agents, order them, add optional directions, select a Claude model, then
+explicitly start the chain. Each stage receives your goal and the previous stage's output. A run may consume
+account quota. The UI exposes the verified tool-free Claude transport only; access to the signed-in account is
+not checked.
 
 **Clientes de IA:** one button per client opens it in a new terminal window in the workspace folder. A client that
 is not installed shows "No instalado".
 
-**Keyboard:** Ctrl+F or `/` search, Esc clears it, ↓ or Enter moves to the results, ↑/↓ move in the list, Enter
-opens the document.
+**Keyboard:** Ctrl+F or `/` search, Esc clears it, ↓ or Enter moves to the results, and ↑/↓ move through them.
+Selecting a supported document previews it in the right workspace; double-clicking opens it in the associated app.
 
 ## Boundary and security
 
-Never writes files. It opens only `.md` files and folders inside the workspace, and starts only the four AI client
-CLIs, each only when you press its button. Task and application commands stay as text to copy. The local server
+Reading reuses the local reading assistant: text extraction and cleanup run locally, translation is sent to local Ollama only when requested, and browser voices may use an online speech service depending on the chosen voice. A chain sends the selected agent profiles, goal, directions and previous outputs to Claude only after the user starts it. Requests run sequentially; failures and uncertain outcomes stop later stages without retries. Run outputs stay in bounded server memory and are cleared by the user or when the server stops. See [chain design and limits](docs/agent-chain-design.md) and [interaction notes](docs/interaction-upgrade.md).
+
+It opens `.md` files and folders inside the workspace and starts the four fixed AI client
+CLIs only when you press their buttons. It never runs task or application commands. The local server
 listens on 127.0.0.1 only and accepts actions only from its own page (Host check, a random per-start token, Origin
 check, fixed command list). Details: [docs/web-architecture.md](docs/web-architecture.md).
 

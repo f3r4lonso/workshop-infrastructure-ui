@@ -364,6 +364,44 @@ class ServerTests(unittest.TestCase):
                 self.assertNotIn(b"outside dist", data)
                 self.assertEqual(status, 403)
 
+    def test_interaction_requires_explicit_origin(self) -> None:
+        status, _ = self.post('/api/interaction/document', {'id': 'unknown'})
+        self.assertEqual(status, 403)
+        status, _, _ = self.request('POST', '/api/interaction/document', json.dumps({'id': 'unknown'}),
+            {'X-Workshop-Token': self.state.token, 'Origin': 'https://foreign.example'})
+        self.assertEqual(status, 403)
+
+    def test_agent_chain_actions_require_explicit_same_origin(self) -> None:
+        status, body = self.post('/api/interaction/chain-status', {'runId': 'unknown'})
+        self.assertEqual(status, 403)
+        self.assertFalse(body['ok'])
+        origin = f'http://127.0.0.1:{self.state.port}'
+        status, body = self.post('/api/interaction/chain-status', {'runId': 'unknown'},
+                                 headers={'Origin': origin})
+        self.assertEqual(status, 200)
+        self.assertFalse(body['ok'])
+        status, body = self.post('/api/interaction/chain-current', {}, headers={'Origin': origin})
+        self.assertEqual(status, 200)
+        self.assertTrue(body['ok'])
+
+    def test_interaction_document_and_protected_save(self) -> None:
+        origin = f'http://127.0.0.1:{self.state.port}'
+        status, _, data = self.request('POST', '/api/interaction/document', json.dumps({'path': 'infra/README.md'}),
+            {'X-Workshop-Token': self.state.token, 'Origin': origin})
+        self.assertEqual(status, 200)
+        loaded = json.loads(data)
+        self.assertTrue(loaded['ok'])
+        self.assertFalse(loaded['editable'])
+        _, _, data = self.request('POST', '/api/interaction/save', json.dumps({'path': 'infra/README.md', 'version': loaded['version'], 'text': 'Overwrite'}),
+            {'X-Workshop-Token': self.state.token, 'Origin': origin})
+        self.assertFalse(json.loads(data)['ok'])
+
+    def test_reader_helper_same_origin(self) -> None:
+        status, headers, data = self.request('GET', '/reader/speech-text.js')
+        self.assertEqual(status, 200)
+        self.assertIn(b'buildChunks', data)
+        self.assertNotIn('access-control-allow-origin', headers)
+
     def test_missing_build_page(self) -> None:
         html = server.render_index(os.path.join(self.temp, "no-dist"), "t").decode("utf-8")
         self.assertIn("npm install", html)

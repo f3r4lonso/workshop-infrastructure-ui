@@ -9,7 +9,7 @@ const TITLE = 'Abrir un cliente de IA';
 function stateText(client, state) {
   if (!client.installed) return 'No instalado';
   if (state?.phase === 'busy') return 'Abriendo…';
-  if (state?.phase === 'done') return 'Abierto ✓';
+  if (state?.phase === 'done') return 'Apertura solicitada';
   return '';
 }
 

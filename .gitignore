@@ -4,3 +4,5 @@ web/node_modules/
 web/dist/
 __pycache__/
 *.pyc
+.preview-edge/
+preview.png

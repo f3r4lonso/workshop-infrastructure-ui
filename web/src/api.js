@@ -103,3 +103,8 @@ export async function launchClient(client) {
   if (mock) return mock.launch(client);
   return request('launch', { method: 'POST', body: { client } });
 }
+
+// Interaction never falls back to demo data: edits and dispatch need the real server.
+export function interaction(action, body = {}) {
+  return request(`interaction/${action}`, { method: 'POST', body });
+}

@@ -28,6 +28,8 @@ from urllib.parse import unquote, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import workshop_data  # noqa: E402
+import resource_interaction  # noqa: E402
+import agent_chains  # noqa: E402
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_INFRA = os.path.normpath(os.path.join(APP_DIR, "..", "..", "infra"))
@@ -343,6 +345,12 @@ class WorkshopHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, self.state.current().payload)
         elif path == "/api/clients":
             self._json(HTTPStatus.OK, clients_payload(workspace_root(self.state)))
+        elif path == "/reader/speech-text.js":
+            helper = resource_interaction.READER_ROOT / 'reading_assistant' / 'static' / 'speech-text.js'
+            try:
+                self._send(HTTPStatus.OK, helper.read_bytes(), CONTENT_TYPES['.js'])
+            except OSError:
+                self._error(HTTPStatus.NOT_FOUND, 'No se encuentra el lector local.')
         elif path == "/api" or path.startswith("/api/"):
             self._error(HTTPStatus.NOT_FOUND, MSG_NOT_FOUND)
         else:
@@ -372,6 +380,18 @@ class WorkshopHandler(BaseHTTPRequestHandler):
         elif path == "/api/launch":
             status, payload = launch_client(body.get("client"), workspace_root(self.state))
             self._json(status, payload)
+        elif path.startswith('/api/interaction/'):
+            if self.headers.get('Origin') not in self.state.allowed_origins():
+                self._error(HTTPStatus.FORBIDDEN, MSG_FORBIDDEN)
+                return
+            action = path.removeprefix('/api/interaction/')
+            if action.startswith('chain-'):
+                payload = agent_chains.handle(action, body, self.state.current(), find_executable)
+            else:
+                payload = resource_interaction.handle(action, self.state.current(), body, find_executable)
+            if action == 'save' and payload.get('ok'):
+                self.state.load()
+            self._json(HTTPStatus.OK, payload)
         else:
             self._error(HTTPStatus.NOT_FOUND, MSG_NOT_FOUND)
 
@@ -405,7 +425,15 @@ class WorkshopHandler(BaseHTTPRequestHandler):
             self.close_connection = True
             self._error(HTTPStatus.BAD_REQUEST, MSG_BAD_JSON)
             return None
-        if length > MAX_BODY:
+        path = self._path()
+        if path == '/api/interaction/upload':
+            # 20 MB binary files encoded as base64 need at most 27 MB plus JSON framing.
+            limit = 28 * 1024 * 1024
+        elif path.startswith('/api/interaction/'):
+            limit = 2 * 1024 * 1024
+        else:
+            limit = MAX_BODY
+        if length > limit:
             self.close_connection = True
             self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, MSG_TOO_LARGE)
             return None

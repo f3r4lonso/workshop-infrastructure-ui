@@ -1,4 +1,4 @@
-import { Fragment, memo, useId } from 'react';
+import { memo, useId } from 'react';
 import { formatDate, statusTone, themeKey } from '../constants.js';
 
 function Pill({ tone, children }) {
@@ -32,10 +32,12 @@ function ResourceList(props) {
   );
 }
 
-function Listbox({ groups, selectedKey, showType, label, listRef, onSelect, onActivate, onOpen, onExitTop }) {
+function Listbox({ groups, selectedKey, showType, label, listRef, onSelect, onActivate, onOpen, onExitTop,
+  collapsedGroups = {}, onToggleGroup }) {
   const baseId = useId();
-  const hasSelection = groups.some((group) => group.entries.some((entry) => entry.key === selectedKey));
-  const tabKey = hasSelection ? selectedKey : groups[0].entries[0].key;
+  const visibleEntries = groups.filter((group) => !collapsedGroups[group.key]).flatMap((group) => group.entries);
+  const hasSelection = visibleEntries.some((entry) => entry.key === selectedKey);
+  const tabKey = hasSelection ? selectedKey : visibleEntries[0]?.key;
 
   function handleKeyDown(event) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -64,7 +66,6 @@ function Listbox({ groups, selectedKey, showType, label, listRef, onSelect, onAc
       case 'Enter':
         event.preventDefault();
         onActivate(options[index].dataset.key);
-        onOpen(options[index].dataset.key);
         return;
       default:
         return;
@@ -101,19 +102,22 @@ function Listbox({ groups, selectedKey, showType, label, listRef, onSelect, onAc
   }
 
   return (
-    <div className="list" role="listbox" aria-label={label} ref={listRef} onKeyDown={handleKeyDown}>
+    <div className="list" aria-label={label} ref={listRef} onKeyDown={handleKeyDown}>
       {groups.map((group, groupIndex) => {
-        if (!group.label) {
-          return <Fragment key={group.key}>{group.entries.map((entry) => renderOption(entry, group.variant))}</Fragment>;
-        }
         const headerId = `${baseId}-g${groupIndex}`;
+        const contentId = `${headerId}-content`;
+        const collapsed = Boolean(collapsedGroups[group.key]);
         return (
-          <div key={group.key} role="group" aria-labelledby={headerId} className="group">
-            <div id={headerId} role="presentation" className={`group-header theme-${group.theme}`}>
+          <div key={group.key} className="group">
+            <button type="button" id={headerId} className={`group-header theme-${group.theme}`}
+              aria-expanded={!collapsed} aria-controls={contentId} onClick={() => onToggleGroup?.(group.key)}>
               <span className="group-dot" aria-hidden="true" />
-              {group.label} <span className="group-count">({group.entries.length})</span>
+              <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+              {group.label || label} <span className="group-count">({group.entries.length})</span>
+            </button>
+            <div id={contentId} role="listbox" aria-labelledby={headerId} hidden={collapsed}>
+              {collapsed ? null : group.entries.map((entry) => renderOption(entry, group.variant))}
             </div>
-            {group.entries.map((entry) => renderOption(entry, group.variant))}
           </div>
         );
       })}

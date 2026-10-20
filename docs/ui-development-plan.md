@@ -1,5 +1,9 @@
 # UI development plan — "see everything I have"
 
+> **Superseded:** historical iteration-2 plan (PowerShell/WinForms era). Current direction: the proposed Workshop AI v2 (`infra/docs/workshop-ai-v2/`).
+
+Historical plan: the React/browser architecture supersedes its PowerShell stack and launch boundaries. The authorized interaction extension is recorded in [interaction-upgrade.md](interaction-upgrade.md), including scoped editing and chat.
+
 Status: built (2026-10-19). The owner asked to develop the project, which was taken as Gate A approval with the
 proposed answers to decisions 2–4. Results and open items: [ui-review.md](ui-review.md).
 
@@ -24,7 +28,7 @@ find any item by typing a word, understand what it is for in plain Spanish, know
 
 | Source | Finding used |
 |---|---|
-| Prompt review of the [task brief](../../../infra/tasks/workshop-infrastructure-windows-ui.md) (`prompt-reviewer`, 2026-10-19, score 3.3/5) | The brief doesn't name all resource types, the source of truth, testable usability criteria, a read-only ban on scripts, the existing app or a plan gate. The current app shows 4 of the infra documents and no applications. It lists a generated adapter file as a client guide, and search only works inside one section. |
+| Prompt review of the [task brief](../../../infra/tasks/projects/workshop-infrastructure-ui/workshop-infrastructure-windows-ui.md) (`prompt-reviewer`, 2026-10-19, score 3.3/5) | The brief doesn't name all resource types, the source of truth, testable usability criteria, a read-only ban on scripts, the existing app or a plan gate. The current app shows 4 of the infra documents and no applications. It lists a generated adapter file as a client guide, and search only works inside one section. |
 | [Product vision](../../../infra/docs/workshop-ai-product-vision.md) | FR-04: the lists must match the catalogue rows, copying no bodies. FR-14: no screens or options without a defined workflow. NFR-06: advanced controls stay out of the way. §17.1: there is no client hub in this app. |
 | [Token-optimization review](../../../infra/docs/token-optimization-candidate-review.md) | Adopt no external tools; stay dependency-free. Apply its "catalogues before bodies" and "measured or it doesn't ship" principles. The app can save tokens indirectly: "copy how to use" gives a short prompt with a file path instead of pasted content. Claim no saving without measurement. |
 | [Desktop-app discovery brief](../../../infra/docs/workshop-ai-desktop-app-discovery-brief.md) | The real need may be to *know what exists and continue work*. This app covers "know what exists" without touching the provider-terms risk. Its §1 cites a path under `documents/` that does not exist (housekeeping, §8). |
@@ -60,7 +64,8 @@ find any item by typing a word, understand what it is for in plain Spanish, know
   its type.
 - **Detail pane:** Spanish type label, description, status, area, location. Then **Cómo usarlo**: for a skill `/name`
   (Claude) and `$name` (Codex); for an agent "Usa el agente <name> …"; for a task "Ejecuta la tarea en
-  `infra/tasks/<file>`". Each comes with a **Copiar** button. Actions: **Abrir documento**, **Abrir carpeta**.
+  `infra/tasks/projects/<project>/<file>`" or `"infra/tasks/common/<category>/<file>"`. Each comes with a
+  **Copiar** button. Actions: **Abrir documento**, **Abrir carpeta**.
   **Relacionado:** for a task, the agents and skills it mentions by name.
 
 ## 5. Phases

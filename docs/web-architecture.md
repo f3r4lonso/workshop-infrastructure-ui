@@ -1,5 +1,13 @@
 # Web version — architecture and API contract
 
+> **v2 note (2026-10-20):** this app is merging into Workshop AI v2 (decisions D-V2-01/02 approved 2026-10-20; `infra/docs/workshop-ai-v2/architecture.md`), which keeps this security model as its minimum. §3 and §4 were corrected in V0 to describe the processes and file writes the server already has.
+
+Current extensions: [interaction upgrade decision, eligibility and verification](interaction-upgrade.md) and [ordered agent-chain design](agent-chain-design.md). The React workspace exposes the reader and a sequential chain editor. Existing scoped editing and single-request dispatch routes remain on the server but are not exposed by the current UI. Original launch API protections remain applicable.
+
+Interaction API: `POST /api/interaction/{document,save,read,prepare-text,upload,translate,reader-status,registry,dispatch,chain-start,chain-current,chain-status,chain-stop,chain-clear}`. All require token, Host and an explicit same-origin Origin. JSON is capped at 2 MB except `upload`, capped at 28 MiB to carry a 20 MB base64 file; other routes retain 4 KB. Document/read accept a catalogue `id` or workspace-relative `path`; only the reader permits DOCX. Document returns raw UTF-8 text, SHA-256 `version`, eligibility and reason. Save accepts `id`, `text`, `version`, returns conflict without overwriting on mismatch. Text editing and pasted-text preparation are capped at 1 MB. Read and in-memory upload reuse the sibling reader extraction/cleanup/detection, capped at 20 MB; uploads are not persisted. Translate accepts explicit text and uses only local Ollama, preserving its own length limits. Chain start validates 2–5 distinct canonical agent IDs and starts one bounded in-memory worker; current/status/stop/clear are same-origin POST actions. The page can recover the active/latest run while the server is running. No prompt, profile or output is logged or saved to disk. The fixed `GET /reader/speech-text.js` serves the reader's speech helper. No permissive CORS or cross-origin proxy is introduced.
+
+Registry separates documented capabilities and public model aliases from unknown authentication/access. Refresh rescans executable availability; no credentials are inspected. Dispatch validates client/model/mode/agent/destination, passes all content through stdin, disables tools/integrations and uses an isolated working directory. New requests only; existing terminals are not destinations. Agent chains call this verified Claude transport once per stage, in order, and pass the previous response as untrusted text alongside the original goal. A failure, uncertain outcome or stop request prevents later stages; no request is retried. One chain runs at a time; active requests cannot be interrupted, and completed run state expires from bounded server memory or is cleared explicitly. Responses are plain escaped text. Output/time/concurrency are bounded. Adapter limitations and provenance are recorded in the interaction decision.
+
 Status: accepted (2026-10-19). Replaces the Windows Forms window at the owner's request ("hazla en un navegador en
 React") and adds buttons that open the AI clients. This is a decision record: it changes the earlier boundary
 "never launches AI clients" (see §4).
@@ -78,11 +86,14 @@ Errors: unknown route 404, bad JSON 400, forbidden 403 — always `{"ok": false,
   and injected into the served `index.html` as `<meta name="workshop-token" content="…">`; if an `Origin` header is
   present it must equal `http://127.0.0.1:<port>` or `http://localhost:<port>`. No CORS headers are ever sent.
 - `POST` bodies are capped at 4 KB and must be JSON.
-- The only processes started are the four fixed client commands and `os.startfile` on a validated `.md` file or folder.
-  No request value is ever placed in a command line.
+- Processes started: the four fixed client console commands; `os.startfile` on a validated `.md` file or folder;
+  `<client> --version` (5-second timeout) to detect installed clients; the tool-free `claude -p` dispatch used by
+  chains (request text on stdin only); and, after a successful agent save, `infra/scripts/codex-adapter.py` to
+  regenerate adapters. No request value is ever placed in a command line.
 - Static files are served only from `web/dist/` (path traversal rejected).
 - The loader keeps the PowerShell version's exclusions: no secrets, generated adapters, vendored folders, junctions
-  or out-of-workspace links. Nothing is written to disk.
+  or out-of-workspace links. The only disk write is the guarded `save` route (allowlisted Workshop documents,
+  hash-checked against the version the page loaded); no screen calls it yet.
 
 Accepted risk: any program already running on this PC as the same Windows user can read the page and its token from
 `127.0.0.1` and press the same buttons. Such a program could start those clients itself, so the server adds no new
@@ -100,7 +111,8 @@ Hardening added after the security review (2026-10-19):
 
 ## 4. Boundary change
 
-Before: read-only, never launches AI clients. Now: still never writes files; it may open `.md` files and folders and
-start the four AI client CLIs in a new terminal window in the workspace root, only when the user presses the button.
-It still never runs scripts, installers, tasks or application commands (those remain text to copy). It is not a
-session/handoff hub (that stays with Workshop AI).
+Before: read-only, never launches AI clients. Now: it writes files only through the guarded `save` route (not yet
+used by any screen); it may open `.md` files and folders,
+start the four AI client CLIs in a new terminal window, and send an explicitly started, bounded chain of text-only
+requests through the verified Claude transport. It still never runs scripts, installers, tasks or application
+commands (those remain text to copy). Chain state is in-memory only, not a resumable client session.

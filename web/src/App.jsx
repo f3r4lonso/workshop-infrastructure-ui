@@ -17,6 +17,7 @@ const LAUNCH_DONE_MS = 4000;
 const STACKED_QUERY = '(max-width: 69.99rem)';
 const EMPTY_SECTIONS = [];
 const RELATED_SECTIONS = new Set(['Agentes', 'Skills', 'Asistentes']);
+const EMPTY_FACETS = {};
 
 function isEditable(target) {
   return target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -42,6 +43,9 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [taskFilter, setTaskFilter] = useState('active');
+  const [facetsBySection, setFacetsBySection] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const navigationState = useRef(new Map());
   const [selectedKey, setSelectedKey] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [launchState, setLaunchState] = useState({});
@@ -127,10 +131,41 @@ export default function App() {
     [data, activeQuery],
   );
 
-  const view = useMemo(
+  const baseView = useMemo(
     () => (data ? buildView({ data, warnings, section, query: activeQuery, results, taskFilter }) : null),
     [data, warnings, section, activeQuery, results, taskFilter],
   );
+
+  const facets = facetsBySection[section] ?? EMPTY_FACETS;
+  const facetDefinitions = useMemo(() => {
+    const entries = baseView?.groups.flatMap((group) => group.entries) ?? [];
+    const definitions = [
+      { key: 'section', label: 'Tipo', value: (item) => item.section || 'Otros' },
+      { key: 'area', label: 'Categoría', value: (item) => item.area || 'Sin categoría' },
+      { key: 'status', label: 'Estado del recurso', value: (item) => item.statusShort || 'Sin estado' },
+      { key: 'format', label: 'Formato', value: (item) => item.relativePath?.match(/\.([^.\\/]+)$/)?.[1]?.toUpperCase() || 'Sin archivo' },
+      { key: 'document', label: 'Documento', value: (item) => item.canOpenDocument ? 'Con documento' : 'Sin documento' },
+    ];
+    return definitions.map((definition) => ({ ...definition,
+      options: [...new Set(entries.map((entry) => definition.value(entry.item)))].sort((a, b) => a.localeCompare(b, 'es')),
+    })).filter((definition) => definition.options.length > 1 || facets[definition.key] || definition.key === 'document');
+  }, [baseView, facets]);
+
+  const view = useMemo(() => {
+    if (!baseView) return null;
+    const groups = baseView.groups.map((group) => ({ ...group,
+      entries: group.entries.filter(({ item }) => facetDefinitions.every((definition) =>
+        !facets[definition.key] || definition.value(item) === facets[definition.key])),
+    })).filter((group) => group.entries.length);
+    const total = baseView.groups.reduce((count, group) => count + group.entries.length, 0);
+    const count = groups.reduce((sum, group) => sum + group.entries.length, 0);
+    const keys = new Map(groups.flatMap((group) => group.entries.map(({ key, item }) => [key, item])));
+    return { ...baseView, groups, keys,
+      countText: `${count} de ${total} elementos · ${baseView.countText}`,
+      emptyMessage: Object.values(facets).some(Boolean)
+        ? 'No hay recursos con estos filtros. Pulsa «Restablecer filtros» para volver a verlos.' : baseView.emptyMessage,
+    };
+  }, [baseView, facets, facetDefinitions]);
 
   const selectedItem = view?.keys.get(selectedKey) ?? null;
 
@@ -153,11 +188,13 @@ export default function App() {
   }, []);
 
   const navigate = useCallback((name) => {
+    navigationState.current.set(section, { query, activeQuery });
+    const saved = navigationState.current.get(name);
     setSection(name);
-    setQuery('');
-    setActiveQuery('');
+    setQuery(saved?.query ?? '');
+    setActiveQuery(saved?.activeQuery ?? '');
     setSelectedKey(null);
-  }, []);
+  }, [section, query, activeQuery]);
 
   const searchFor = useCallback(
     (text) => {
@@ -346,6 +383,7 @@ export default function App() {
             <span key={index} className="tile tile--skeleton" />
           ))}
         </div>
+
         <div className="workspace">{listSkeleton}</div>
       </div>
     );
@@ -371,6 +409,29 @@ export default function App() {
           ) : null}
         </div>
 
+        <div className="resource-filters" role="region" aria-label="Filtros de recursos">
+          {facetDefinitions.map((definition) => (
+            <div className="filter" key={definition.key}>
+              <label htmlFor={`facet-${definition.key}`}>{definition.label}</label>
+              <select id={`facet-${definition.key}`} value={facets[definition.key] ?? ''}
+                onChange={(event) => setFacetsBySection((previous) => ({ ...previous,
+                  [section]: { ...previous[section], [definition.key]: event.target.value },
+                }))}>
+                <option value="">Todos</option>
+                {facets[definition.key] && !definition.options.includes(facets[definition.key])
+                  ? <option value={facets[definition.key]}>{facets[definition.key]} (sin resultados)</option> : null}
+                {definition.options.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+          ))}
+          <button type="button" className="button" onClick={() => {
+            setFacetsBySection((previous) => ({ ...previous, [section]: {} }));
+            setTaskFilter('all');
+            clearSearch();
+          }}>Restablecer filtros</button>
+          <p className="page-intro">{view.countText}</p>
+        </div>
+
         {showTiles ? (
           <HomeTiles sections={sections} counts={counts} activeTasks={activeTasks} onNavigate={navigate} />
         ) : null}
@@ -387,10 +448,12 @@ export default function App() {
             onActivate={activateKey}
             onOpen={handleOpenKey}
             onExitTop={focusSearch}
+            collapsedGroups={collapsedGroups}
+            onToggleGroup={(key) => setCollapsedGroups((previous) => ({ ...previous, [key]: !previous[key] }))}
           />
           <DetailPanel
-            key={selectedItem ? selectedKey : 'none'}
             item={selectedItem}
+            resources={items ?? []}
             relatedLookup={relatedLookup}
             panelRef={detailRef}
             onBackToList={backToList}

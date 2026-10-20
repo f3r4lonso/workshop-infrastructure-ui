@@ -1,5 +1,7 @@
 # UI/UX review
 
+Current partial interaction extension: [UX findings, architectural decision, performed checks and remaining acceptance](interaction-upgrade.md). Historical iteration boundaries below describe their respective versions.
+
 ## Iteration 3: web version (2026-10-19)
 
 The owner rejected the desktop technology and asked for a React app in the browser, with buttons that open the AI
@@ -51,7 +53,7 @@ The owner asked to develop the project; the plan's proposed answers were applied
 3. Completed, retired and superseded tasks: hidden behind the status filter (default «Activas»), and marked
    "No ejecutar" with nothing to copy.
 4. Applications: open the README or folder only; the launch command is shown and copied as text, never run.
-5. Brief rewrite: the scope details were added to `infra/tasks/workshop-infrastructure-windows-ui.md`.
+5. Brief rewrite: scope details were incorporated into the unified task at `infra/tasks/projects/workshop-infrastructure-ui/workshop-infrastructure-windows-ui.md`.
 
 ## What changed
 
